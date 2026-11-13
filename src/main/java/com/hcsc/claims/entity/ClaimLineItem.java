@@ -1,8 +1,10 @@
 package com.hcsc.claims.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * EJB Entity Bean — ClaimLineItem
@@ -14,6 +16,7 @@ import java.math.BigDecimal;
 public class ClaimLineItem implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger log = LoggerFactory.getLogger(ClaimLineItem.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "LINE_ITEM_SEQ")
