@@ -3,6 +3,7 @@ package com.hcsc.claims.jms;
 import org.apache.log4j.Logger;
 import jakarta.jms.*;
 import jakarta.naming.InitialContext;
+import jakarta.naming.NamingException;
 import org.springframework.stereotype.Component;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.transaction.annotation.Transactional;
