@@ -7,18 +7,20 @@ import com.hcsc.claims.util.ClaimNumberGenerator;
 import com.hcsc.claims.util.PHIAuditLogger;
 import org.apache.log4j.Logger;
 
-import javax.annotation.Resource;
-import javax.ejb.*;
-import javax.jms.*;
+import jakarta.annotation.Resource;
+import jakarta.ejb.*;
+import jakarta.jms.*;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.transaction.UserTransaction;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.UserTransaction;
 import java.math.BigDecimal;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * EJB 3.1 Stateless Session Bean — Claim Processing
@@ -38,10 +40,9 @@ import java.util.List;
  *   - UserTransaction → @Transactional
  *   - JNDI lookups → Spring @Value / @Autowired
  *   - IBM MQ → Spring JMS
- *   - javax.persistence → jakarta.persistence
+ *   - jakarta.persistence → jakarta.persistence
  */
-@Stateless(name = "ClaimProcessingBean", mappedName = "ejb/ClaimProcessingBean")
-@TransactionManagement(TransactionManagementType.BEAN)
+@Service
 public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessingRemote {
 
     private static final Logger log = Logger.getLogger(ClaimProcessingBean.class);
@@ -58,14 +59,17 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
     @Resource
     private UserTransaction userTransaction;
 
-    @EJB
-    private MemberValidationBean memberValidationBean;
+    private final MemberValidationBean memberValidationBean;
 
-    @EJB
-    private BenefitCalculationBean benefitCalculationBean;
+    private final BenefitCalculationBean benefitCalculationBean;
 
-    @EJB
-    private FraudDetectionBean fraudDetectionBean;
+    private final FraudDetectionBean fraudDetectionBean;
+
+    public ClaimProcessingBean(MemberValidationBean memberValidationBean, BenefitCalculationBean benefitCalculationBean, FraudDetectionBean fraudDetectionBean) {
+        this.memberValidationBean = memberValidationBean;
+        this.benefitCalculationBean = benefitCalculationBean;
+        this.fraudDetectionBean = fraudDetectionBean;
+    }
 
     /**
      * Submit a new claim for processing.
@@ -149,7 +153,6 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             log.info("Claim submitted successfully: " + claim.getClaimNumber()
                 + " status=" + claim.getStatus());
             return claim;
-
         } catch (Exception e) {
             log.error("Error submitting claim for member: " + claim.getMemberId(), e);
             try {
@@ -157,7 +160,7 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             } catch (Exception rollbackEx) {
                 log.error("Rollback failed", rollbackEx);
             }
-            throw new EJBException("Failed to submit claim", e);
+            throw new RuntimeException("Failed to submit claim", e);
         }
     }
 
@@ -173,12 +176,12 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
 
             Claim originalClaim = entityManager.find(Claim.class, originalClaimId);
             if (originalClaim == null) {
-                throw new EJBException("Claim not found: " + originalClaimId);
+                throw new RuntimeException("Claim not found: " + originalClaimId);
             }
 
             if (!"DENIED".equals(originalClaim.getStatus())
                 && !"PARTIAL".equals(originalClaim.getStatus())) {
-                throw new EJBException("Only DENIED or PARTIAL claims can be appealed");
+                throw new RuntimeException("Only DENIED or PARTIAL claims can be appealed");
             }
 
             // Check appeal deadline — must be within 180 days of original decision
@@ -186,7 +189,7 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             appealDeadline.setTime(originalClaim.getSubmittedDate());
             appealDeadline.add(Calendar.DAY_OF_YEAR, 180);
             if (new Date().after(appealDeadline.getTime())) {
-                throw new EJBException("Appeal deadline has passed — 180 days from original submission");
+                throw new RuntimeException("Appeal deadline has passed — 180 days from original submission");
             }
 
             // Create appeal claim
@@ -223,13 +226,12 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             log.info("Appeal created: " + appealClaim.getClaimNumber()
                 + " for original: " + originalClaim.getClaimNumber());
             return appealClaim;
-
-        } catch (EJBException e) {
+        } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             log.error("Error processing appeal for claimId: " + originalClaimId, e);
             try { userTransaction.rollback(); } catch (Exception re) { log.error("Rollback failed", re); }
-            throw new EJBException("Failed to process appeal", e);
+            throw new RuntimeException("Failed to process appeal", e);
         }
     }
 
@@ -292,7 +294,6 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
 
             producer.send(message);
             log.info("JMS notification sent: " + eventType + " for claim: " + claim.getClaimNumber());
-
         } catch (NamingException e) {
             log.error("JNDI lookup failed for JMS resources", e);
             // Non-fatal — claim processing continues even if notification fails
