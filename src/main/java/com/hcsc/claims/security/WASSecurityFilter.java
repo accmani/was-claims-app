@@ -1,29 +1,22 @@
 package com.hcsc.claims.security;
 
-import com.ibm.websphere.security.auth.WSSubject;
-import com.ibm.websphere.security.cred.WSCredential;
-import org.apache.log4j.Logger;
-
-import javax.security.auth.Subject;
-import javax.servlet.*;
-import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import java.io.IOException;
-import java.security.PrivilegedAction;
-import java.util.Set;
+import java.util.List;
 
 /**
  * WAS JAAS Security Filter
  *
  * Integrates with WebSphere Application Server's built-in JAAS security framework.
  * Validates that requests are authenticated by WAS and extracts the caller identity.
- *
- * WAS-specific:
- *   - com.ibm.websphere.security.auth.WSSubject — IBM proprietary, NO Spring equivalent
- *   - com.ibm.websphere.security.cred.WSCredential — IBM proprietary
- *   - WAS role mapping via ibm-application-bnd.xml
  *
  * Migration note:
  *   THIS CLASS REQUIRES ARCHITECTURAL DECISION (Checkpoint D).
@@ -36,14 +29,10 @@ import java.util.Set;
  *   WAS roles (claims-adjuster, claims-supervisor, claims-readonly, medical-review)
  *   must be mapped to Spring Security authorities/roles.
  */
-@WebFilter(
-    filterName = "WASSecurityFilter",
-    urlPatterns = {"/api/*"},
-    dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD}
-)
+@Component
 public class WASSecurityFilter implements Filter {
 
-    private static final Logger log = Logger.getLogger(WASSecurityFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(WASSecurityFilter.class);
 
     // WAS security roles defined in ibm-application-bnd.xml
     public static final String ROLE_CLAIMS_ADJUSTER   = "claims-adjuster";
@@ -63,65 +52,43 @@ public class WASSecurityFilter implements Filter {
         HttpServletRequest httpRequest   = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-        try {
-            // Get the WAS caller subject — IBM proprietary API
-            // Migration: SecurityContextHolder.getContext().getAuthentication()
-            Subject callerSubject = WSSubject.getCallerSubject();
-
-            if (callerSubject == null) {
-                log.warn("No WAS caller subject — unauthenticated request to: "
-                    + httpRequest.getRequestURI());
-                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                httpResponse.getWriter().write("{\"error\":\"Authentication required\"}");
-                return;
-            }
-
-            // Extract WSCredential from Subject — IBM proprietary
-            // Migration: use Authentication.getPrincipal() / OAuth2User / UserDetails
-            Set<WSCredential> credentials = callerSubject.getPublicCredentials(WSCredential.class);
-            if (credentials.isEmpty()) {
-                log.warn("WAS subject has no WSCredential — invalid security state");
-                httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                httpResponse.getWriter().write("{\"error\":\"Invalid security credentials\"}");
-                return;
-            }
-
-            WSCredential credential = credentials.iterator().next();
-            String userId = credential.getSecurityName();
-            java.util.List roles = credential.getRoles();
-
-            log.info("Authenticated request: user=" + userId
-                + " uri=" + httpRequest.getRequestURI());
-
-            // Store in session for downstream use
-            // Migration: Spring Security handles this via SecurityContext
-            HttpSession session = httpRequest.getSession(true);
-            session.setAttribute("authenticatedUser", userId);
-            session.setAttribute("userRoles", roles);
-
-            // Role-based access control — specific endpoints
-            String uri = httpRequest.getRequestURI();
-            if (uri.contains("/admin/") && !hasRole(roles, ROLE_CLAIMS_SUPERVISOR)) {
-                log.warn("Access denied to admin endpoint for user: " + userId);
-                httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                httpResponse.getWriter().write("{\"error\":\"Insufficient privileges\"}");
-                return;
-            }
-
-            if (uri.contains("/medical-review/") && !hasRole(roles, ROLE_MEDICAL_REVIEW)) {
-                log.warn("Access denied to medical review endpoint for user: " + userId);
-                httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                httpResponse.getWriter().write("{\"error\":\"Insufficient privileges\"}");
-                return;
-            }
-
-            chain.doFilter(request, response);
-
-        } catch (com.ibm.websphere.security.WSSecurityException e) {
-            log.error("WAS security exception — cannot determine caller identity", e);
-            httpResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            httpResponse.getWriter().write("{\"error\":\"Security framework error\"}");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            log.warn("No authenticated user — unauthenticated request to: " + httpRequest.getRequestURI());
+            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            httpResponse.getWriter().write("{\"error\":\"Authentication required\"}");
+            return;
         }
+
+        String userId = authentication.getName();
+        List<String> roles = authentication.getAuthorities().stream()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .toList();
+
+        log.info("Authenticated request: user=" + userId + " uri=" + httpRequest.getRequestURI());
+
+        // Store in session for downstream use
+        HttpSession session = httpRequest.getSession(true);
+        session.setAttribute("authenticatedUser", userId);
+        session.setAttribute("userRoles", roles);
+
+        // Role-based access control — specific endpoints
+        String uri = httpRequest.getRequestURI();
+        if (uri.contains("/admin/") && !hasRole(roles, ROLE_CLAIMS_SUPERVISOR)) {
+            log.warn("Access denied to admin endpoint for user: " + userId);
+            httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            httpResponse.getWriter().write("{\"error\":\"Insufficient privileges\"}");
+            return;
+        }
+
+        if (uri.contains("/medical-review/") && !hasRole(roles, ROLE_MEDICAL_REVIEW)) {
+            log.warn("Access denied to medical review endpoint for user: " + userId);
+            httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            httpResponse.getWriter().write("{\"error\":\"Insufficient privileges\"}");
+            return;
+        }
+
+        chain.doFilter(request, response);
     }
 
     @Override
@@ -129,7 +96,7 @@ public class WASSecurityFilter implements Filter {
         log.info("WASSecurityFilter destroyed");
     }
 
-    private boolean hasRole(java.util.List roles, String roleName) {
+    private boolean hasRole(List<String> roles, String roleName) {
         if (roles == null) return false;
         return roles.contains(roleName);
     }
