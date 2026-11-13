@@ -15,35 +15,35 @@ import java.util.List;
 @RequestMapping("/claims")
 public class ClaimProcessingController {
 
-    private final ClaimProcessingRemote claimProcessingRemote;
+    private final ClaimProcessingBean claimProcessingBean;
 
-    public ClaimProcessingController(ClaimProcessingRemote claimProcessingRemote) {
-        this.claimProcessingRemote = claimProcessingRemote;
+    public ClaimProcessingController(ClaimProcessingBean claimProcessingBean) {
+        this.claimProcessingBean = claimProcessingBean;
     }
 
     @PostMapping("/submit")
     @Transactional
     public ResponseEntity<Claim> submitClaim(@RequestBody Claim claim, @RequestParam String submittedBy) {
-        Claim submittedClaim = claimProcessingRemote.submitClaim(claim, submittedBy);
+        Claim submittedClaim = claimProcessingBean.submitClaim(claim, submittedBy);
         return new ResponseEntity<>(submittedClaim, HttpStatus.CREATED);
     }
 
     @PostMapping("/appeal")
     @Transactional
     public ResponseEntity<Claim> appealClaim(@RequestParam Long originalClaimId, @RequestParam String appealReason, @RequestParam String appealedBy) {
-        Claim appealedClaim = claimProcessingRemote.appealClaim(originalClaimId, appealReason, appealedBy);
+        Claim appealedClaim = claimProcessingBean.appealClaim(originalClaimId, appealReason, appealedBy);
         return new ResponseEntity<>(appealedClaim, HttpStatus.OK);
     }
 
     @GetMapping("/member/{memberId}")
     public ResponseEntity<List<Claim>> getClaimsForMember(@PathVariable String memberId, @RequestParam int page, @RequestParam int pageSize) {
-        List<Claim> claims = claimProcessingRemote.getClaimsForMember(memberId, page, pageSize);
+        List<Claim> claims = claimProcessingBean.getClaimsForMember(memberId, page, pageSize);
         return new ResponseEntity<>(claims, HttpStatus.OK);
     }
 
     @GetMapping("/pending")
     public ResponseEntity<List<Claim>> findPendingClaimsOlderThan(@RequestParam int days) {
-        List<Claim> pendingClaims = claimProcessingRemote.findPendingClaimsOlderThan(days);
+        List<Claim> pendingClaims = claimProcessingBean.findPendingClaimsOlderThan(days);
         return new ResponseEntity<>(pendingClaims, HttpStatus.OK);
     }
 }
