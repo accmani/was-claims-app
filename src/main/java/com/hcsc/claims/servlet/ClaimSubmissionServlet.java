@@ -3,21 +3,21 @@ package com.hcsc.claims.servlet;
 import com.hcsc.claims.ejb.session.ClaimProcessingLocal;
 import com.hcsc.claims.entity.Claim;
 import org.apache.log4j.Logger;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * HTTP Servlet — Claim Submission
@@ -40,59 +40,102 @@ import java.util.List;
  *   - web.xml mapping → @RequestMapping annotation
  */
 @RestController
-@RequestMapping("/api/claims")
+@RequestMapping("/{"/api/claims/submit"}")
 public class ClaimSubmissionServlet {
 
     private static final Logger log = Logger.getLogger(ClaimSubmissionServlet.class);
+    private static final long serialVersionUID = 1L;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
     private final ClaimProcessingLocal claimProcessingBean;
 
-    @Autowired
-    public ClaimSubmissionServlet(ClaimProcessingLocal claimProcessingBean) {
+    public ClaimSubmissionServlet(ClaimProcessingLocal claimProcessingBean, ClaimProcessingLocal claimProcessingBean) {
+        this.claimProcessingBean = claimProcessingBean;
         this.claimProcessingBean = claimProcessingBean;
     }
 
-    @PostMapping("/submit")
-    @Transactional
-    public ResponseEntity<String> doPost(@RequestBody Claim claim, HttpServletRequest request) {
+    @Override
+    public void init() throws ServletException {
+        super.init();
+        // Fallback JNDI lookup if @EJB injection fails (older WAS behaviour)
+        if (claimProcessingBean == null) {
+            try {
+            } catch (Exception e) {
+                throw new ServletException("Failed to lookup ClaimProcessingBean via JNDI", e);
+            }
+        }
+        log.info("ClaimSubmissionServlet initialised");
+    }
+
+    @PostMapping
+    public void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        PrintWriter out = response.getWriter();
+
+        // Get authenticated user from WAS session
+        // Migration: replace with SecurityContextHolder.getContext().getAuthentication()
         HttpSession session = request.getSession(false);
         if (session == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"error\":\"Unauthorized — no active session\"}");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            out.print("{\"error\":\"Unauthorized — no active session\"}");
+            return;
         }
 
         String submittedBy = (String) session.getAttribute("authenticatedUser");
         if (submittedBy == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"error\":\"Unauthorized — user not authenticated\"}");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            out.print("{\"error\":\"Unauthorized — user not authenticated\"}");
+            return;
         }
 
         try {
+            // Parse request parameters — Migration: replace with @RequestBody Claim claim
+            Claim claim = parseClaimFromRequest(request);
+
             // Validate required fields
             String validationError = validateClaimRequest(claim);
             if (validationError != null) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\":\"" + escapeJson(validationError) + "\"}");
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"error\":\"" + escapeJson(validationError) + "\"}");
+                return;
             }
 
             // Process claim
             Claim result = claimProcessingBean.submitClaim(claim, submittedBy);
 
             // Return response — Migration: return Claim object, Jackson serialises automatically
-            return ResponseEntity.status(HttpStatus.CREATED).body(buildClaimResponse(result));
+            response.setStatus(HttpServletResponse.SC_CREATED);
+            out.print(buildClaimResponse(result));
 
+            log.info("Claim submission successful: " + result.getClaimNumber()
+                + " user: " + submittedBy);
         } catch (ParseException e) {
             log.warn("Invalid date format in claim submission", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\":\"Invalid date format — expected yyyy-MM-dd\"}");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            out.print("{\"error\":\"Invalid date format — expected yyyy-MM-dd\"}");
         } catch (Exception e) {
             log.error("Error processing claim submission for user: " + submittedBy, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\":\"Internal server error — please contact support\"}");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print("{\"error\":\"Internal server error — please contact support\"}");
         }
     }
 
-    @GetMapping("/submit")
-    public ResponseEntity<String> doGet(HttpServletRequest request) {
+    @GetMapping
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
         if (session == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"error\":\"Unauthorized\"}");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().print("{\"error\":\"Unauthorized\"}");
+            return;
         }
 
         String memberId = request.getParameter("memberId");
@@ -100,14 +143,17 @@ public class ClaimSubmissionServlet {
         String sizeStr  = request.getParameter("size");
 
         if (memberId == null || memberId.trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\":\"memberId parameter required\"}");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print("{\"error\":\"memberId parameter required\"}");
+            return;
         }
 
         int page = pageStr != null ? Integer.parseInt(pageStr) : 1;
         int size = sizeStr != null ? Integer.parseInt(sizeStr) : 20;
 
         try {
-            List<Claim> claims = claimProcessingBean.getClaimsForMember(memberId, page, size);
+            java.util.List<Claim> claims =
+                claimProcessingBean.getClaimsForMember(memberId, page, size);
 
             StringBuilder sb = new StringBuilder("[");
             for (int i = 0; i < claims.size(); i++) {
@@ -116,11 +162,26 @@ public class ClaimSubmissionServlet {
             }
             sb.append("]");
 
-            return ResponseEntity.ok(sb.toString());
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().print(sb.toString());
         } catch (Exception e) {
             log.error("Error retrieving claims for member: " + memberId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\":\"Internal server error\"}");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().print("{\"error\":\"Internal server error\"}");
         }
+    }
+
+    private Claim parseClaimFromRequest(HttpServletRequest request) throws ParseException {
+        Claim claim = new Claim();
+        claim.setMemberId(request.getParameter("memberId"));
+        claim.setProviderNpi(request.getParameter("providerNpi"));
+        claim.setServiceDate(DATE_FORMAT.parse(request.getParameter("serviceDate")));
+        claim.setBilledAmount(new BigDecimal(request.getParameter("billedAmount")));
+        claim.setDiagnosisCode(request.getParameter("diagnosisCode"));
+        claim.setProcedureCode(request.getParameter("procedureCode"));
+        claim.setPlanCode(request.getParameter("planCode"));
+        claim.setGroupNumber(request.getParameter("groupNumber"));
+        return claim;
     }
 
     private String validateClaimRequest(Claim claim) {
@@ -142,13 +203,14 @@ public class ClaimSubmissionServlet {
     private String buildClaimResponse(Claim claim) {
         // Manual JSON — Migration: return Claim object, Spring/Jackson handles serialisation
         return "{" +
-            \"claimId\":\"" + claim.getClaimId() + "\",\" +
-            \"claimNumber\":\"" + escapeJson(claim.getClaimNumber()) + "\",\" +
-            \"status\":\"" + escapeJson(claim.getStatus()) + "\",\" +
-            \"billedAmount\":\"" + claim.getBilledAmount() + "\",\" +
-            \"allowedAmount\":\"" + (claim.getAllowedAmount() != null ? claim.getAllowedAmount() : "null") + "\",\" +
-            \"paidAmount\":\"" + (claim.getPaidAmount() != null ? claim.getPaidAmount() : "null") + "\",\" +
-            \"denialReason\":\"" + (claim.getDenialReason() != null ? escapeJson(claim.getDenialReason()) : "null") + "\" +
+            "\"claimId\":" + claim.getClaimId() + "," +
+            "\"claimNumber\":\"" + escapeJson(claim.getClaimNumber()) + "\"," +
+            "\"status\":\"" + escapeJson(claim.getStatus()) + "\"," +
+            "\"billedAmount\":" + claim.getBilledAmount() + "," +
+            "\"allowedAmount\":" + (claim.getAllowedAmount() != null ? claim.getAllowedAmount() : "null") + "," +
+            "\"paidAmount\":" + (claim.getPaidAmount() != null ? claim.getPaidAmount() : "null") + "," +
+            "\"denialReason\":" + (claim.getDenialReason() != null
+                ? "\"" + escapeJson(claim.getDenialReason()) + "\"" : "null") +
             "}";
     }
 
