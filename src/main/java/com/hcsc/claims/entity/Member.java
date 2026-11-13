@@ -2,7 +2,7 @@ package com.hcsc.claims.entity;
 
 import jakarta.persistence.*;
 import java.io.Serializable;
-import java.time.LocalDate;
+import java.util.Date;
 
 /**
  * EJB Entity Bean — Member
@@ -34,7 +34,8 @@ public class Member implements Serializable {
 
     // PHI — do NOT log
     @Column(name = "DATE_OF_BIRTH", nullable = false)
-    private LocalDate dateOfBirth;
+    @Temporal(TemporalType.DATE)
+    private Date dateOfBirth;
 
     // PHI — do NOT log — stored encrypted
     @Column(name = "SSN_ENCRYPTED", length = 256)
@@ -47,10 +48,12 @@ public class Member implements Serializable {
     private String groupNumber;
 
     @Column(name = "EFFECTIVE_DATE", nullable = false)
-    private LocalDate effectiveDate;
+    @Temporal(TemporalType.DATE)
+    private Date effectiveDate;
 
     @Column(name = "TERMINATION_DATE")
-    private LocalDate terminationDate;
+    @Temporal(TemporalType.DATE)
+    private Date terminationDate;
 
     @Column(name = "STATUS", nullable = false, length = 10)
     private String status;  // ACTIVE, TERMED, COBRA, SUSPENDED
@@ -75,18 +78,18 @@ public class Member implements Serializable {
     public void setFirstName(String firstName) { this.firstName = firstName; }
     public String getLastName() { return lastName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
-    public LocalDate getDateOfBirth() { return dateOfBirth; }
-    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+    public Date getDateOfBirth() { return dateOfBirth; }
+    public void setDateOfBirth(Date dateOfBirth) { this.dateOfBirth = dateOfBirth; }
     public String getSsnEncrypted() { return ssnEncrypted; }
     public void setSsnEncrypted(String ssnEncrypted) { this.ssnEncrypted = ssnEncrypted; }
     public String getPlanCode() { return planCode; }
     public void setPlanCode(String planCode) { this.planCode = planCode; }
     public String getGroupNumber() { return groupNumber; }
     public void setGroupNumber(String groupNumber) { this.groupNumber = groupNumber; }
-    public LocalDate getEffectiveDate() { return effectiveDate; }
-    public void setEffectiveDate(LocalDate effectiveDate) { this.effectiveDate = effectiveDate; }
-    public LocalDate getTerminationDate() { return terminationDate; }
-    public void setTerminationDate(LocalDate terminationDate) { this.terminationDate = terminationDate; }
+    public Date getEffectiveDate() { return effectiveDate; }
+    public void setEffectiveDate(Date effectiveDate) { this.effectiveDate = effectiveDate; }
+    public Date getTerminationDate() { return terminationDate; }
+    public void setTerminationDate(Date terminationDate) { this.terminationDate = terminationDate; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getEmail() { return email; }
