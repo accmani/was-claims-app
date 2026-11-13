@@ -142,13 +142,13 @@ public class ClaimSubmissionServlet {
     private String buildClaimResponse(Claim claim) {
         // Manual JSON — Migration: return Claim object, Spring/Jackson handles serialisation
         return "{" +
-            \"claimId\":\"" + claim.getClaimId() + "\",\"" +
-            \"claimNumber\":\"" + escapeJson(claim.getClaimNumber()) + "\",\"" +
-            \"status\":\"" + escapeJson(claim.getStatus()) + "\",\"" +
-            \"billedAmount\":\"" + claim.getBilledAmount() + "\",\"" +
-            \"allowedAmount\":\"" + (claim.getAllowedAmount() != null ? claim.getAllowedAmount() : "null") + "\",\"" +
-            \"paidAmount\":\"" + (claim.getPaidAmount() != null ? claim.getPaidAmount() : "null") + "\",\"" +
-            \"denialReason\":\"" + (claim.getDenialReason() != null ? escapeJson(claim.getDenialReason()) : "null") + "\"" +
+            \"claimId\":\"" + claim.getClaimId() + "\",\" +
+            \"claimNumber\":\"" + escapeJson(claim.getClaimNumber()) + "\",\" +
+            \"status\":\"" + escapeJson(claim.getStatus()) + "\",\" +
+            \"billedAmount\":\"" + claim.getBilledAmount() + "\",\" +
+            \"allowedAmount\":\"" + (claim.getAllowedAmount() != null ? claim.getAllowedAmount() : "null") + "\",\" +
+            \"paidAmount\":\"" + (claim.getPaidAmount() != null ? claim.getPaidAmount() : "null") + "\",\" +
+            \"denialReason\":\"" + (claim.getDenialReason() != null ? escapeJson(claim.getDenialReason()) : "null") + "\" +
             "}";
     }
 
