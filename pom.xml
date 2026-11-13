@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.hcsc.claims</groupId>
+    <artifactId>was-claims-app</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+    <name>was-claims-app</name>
+    <description>Baseline build of the WebSphere (WAS 8.5.5 / Java EE 7 / Java 8) claims application, added so the migration platform can compile it before and after migration.</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <failOnMissingWebXml>false</failOnMissingWebXml>
+    </properties>
+
+    <dependencies>
+        <!-- Java EE 7 platform API: provided by WebSphere at runtime -->
+        <dependency>
+            <groupId>javax</groupId>
+            <artifactId>javaee-api</artifactId>
+            <version>7.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- IBM WebSphere API stubs: compile-time only (system scope is required by Maven
+             whenever systemPath is used; it is not packaged into the WAR). The real classes come from the WAS container.
+             Sources: lib/ibm-was-stubs-8.5.5-sources.jar -->
+        <dependency>
+            <groupId>com.ibm.websphere</groupId>
+            <artifactId>ibm-was-stubs</artifactId>
+            <version>8.5.5</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/ibm-was-stubs-8.5.5.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
+
+        <!-- Tests: JUnit 4 + Mockito 1.x (WAS-era stack) -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+            <version>1.10.19</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>was-claims-app</finalName>
+    </build>
+
+    <profiles>
+        <!-- Mockito 1.x (cglib) needs reflective access to java.lang when the baseline is built on JDK 9+ (e.g. the migration platform's JDK 17). Not active on Java 8. -->
+        <profile>
+            <id>jdk9plus-mockito1</id>
+            <activation><jdk>[9,)</jdk></activation>
+            <properties>
+                <argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+            </properties>
+        </profile>
+    </profiles>
+</project>
