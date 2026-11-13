@@ -8,7 +8,6 @@ import com.hcsc.claims.util.PHIAuditLogger;
 import org.apache.log4j.Logger;
 
 import jakarta.annotation.Resource;
-import jakarta.ejb.*;
 import jakarta.jms.*;
 import jakarta.naming.InitialContext;
 import jakarta.naming.NamingException;
@@ -255,5 +254,21 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
         sb.append("\"timestamp\":\"").append(new Date()).append("\"");
         sb.append("}");
         return sb.toString();
+    }
+
+    private Date convertToDate(LocalDate localDate) {
+        return localDate == null ? null : Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    }
+
+    private LocalDate convertToLocalDate(Date date) {
+        return date == null ? null : date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private LocalDateTime convertToLocalDateTime(Date date) {
+        return date == null ? null : date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    private Date convertToDate(LocalDateTime localDateTime) {
+        return localDateTime == null ? null : Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
     }
 }
