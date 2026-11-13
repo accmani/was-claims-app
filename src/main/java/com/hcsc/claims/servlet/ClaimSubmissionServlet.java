@@ -2,22 +2,23 @@ package com.hcsc.claims.servlet;
 
 import com.hcsc.claims.ejb.session.ClaimProcessingLocal;
 import com.hcsc.claims.entity.Claim;
+import com.hcsc.claims.util.PHIAuditLogger;
 import org.apache.log4j.Logger;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
+import javax.ejb.EJB;
+import javax.naming.InitialContext;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * HTTP Servlet — Claim Submission
@@ -39,20 +40,19 @@ import org.springframework.web.bind.annotation.GetMapping;
  *   - HttpSession identity → Spring Security SecurityContextHolder
  *   - web.xml mapping → @RequestMapping annotation
  */
-@RestController
-@RequestMapping("/{"/api/claims/submit"}")
-public class ClaimSubmissionServlet {
+@WebServlet(
+    name = "ClaimSubmissionServlet",
+    urlPatterns = {"/api/claims/submit"},
+    loadOnStartup = 1
+)
+public class ClaimSubmissionServlet extends HttpServlet {
 
     private static final Logger log = Logger.getLogger(ClaimSubmissionServlet.class);
     private static final long serialVersionUID = 1L;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
-    private final ClaimProcessingLocal claimProcessingBean;
-
-    public ClaimSubmissionServlet(ClaimProcessingLocal claimProcessingBean, ClaimProcessingLocal claimProcessingBean) {
-        this.claimProcessingBean = claimProcessingBean;
-        this.claimProcessingBean = claimProcessingBean;
-    }
+    @EJB(beanName = "ClaimProcessingBean")
+    private ClaimProcessingLocal claimProcessingBean;
 
     @Override
     public void init() throws ServletException {
@@ -60,6 +60,9 @@ public class ClaimSubmissionServlet {
         // Fallback JNDI lookup if @EJB injection fails (older WAS behaviour)
         if (claimProcessingBean == null) {
             try {
+                InitialContext ctx = new InitialContext();
+                claimProcessingBean = (ClaimProcessingLocal)
+                    ctx.lookup("ejblocal:ClaimProcessingBean");
             } catch (Exception e) {
                 throw new ServletException("Failed to lookup ClaimProcessingBean via JNDI", e);
             }
@@ -67,8 +70,8 @@ public class ClaimSubmissionServlet {
         log.info("ClaimSubmissionServlet initialised");
     }
 
-    @PostMapping
-    public void doPost(HttpServletRequest request, HttpServletResponse response)
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         response.setContentType("application/json");
@@ -113,6 +116,7 @@ public class ClaimSubmissionServlet {
 
             log.info("Claim submission successful: " + result.getClaimNumber()
                 + " user: " + submittedBy);
+
         } catch (ParseException e) {
             log.warn("Invalid date format in claim submission", e);
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -124,8 +128,8 @@ public class ClaimSubmissionServlet {
         }
     }
 
-    @GetMapping
-    public void doGet(HttpServletRequest request, HttpServletResponse response)
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         response.setContentType("application/json");
@@ -164,6 +168,7 @@ public class ClaimSubmissionServlet {
 
             response.setStatus(HttpServletResponse.SC_OK);
             response.getWriter().print(sb.toString());
+
         } catch (Exception e) {
             log.error("Error retrieving claims for member: " + memberId, e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
