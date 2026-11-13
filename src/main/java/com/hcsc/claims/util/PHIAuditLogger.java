@@ -33,8 +33,6 @@ import java.time.Instant;
 public class PHIAuditLogger {
 
     private static final Logger log = LoggerFactory.getLogger(PHIAuditLogger.class);
-    private static final String AUDIT_DATASOURCE_JNDI = "jdbc/hcscAuditDS";
-
     private final DataSource dataSource;
 
     @Autowired
@@ -52,8 +50,6 @@ public class PHIAuditLogger {
      */
     @Async
     public void log(String eventType, String resourceId, String userId, String description) {
-        // Write to audit log asynchronously — do NOT block business operation
-        // Migration: @Async Spring method
         writeAuditLog(eventType, resourceId, userId, description);
     }
 
@@ -64,8 +60,6 @@ public class PHIAuditLogger {
                      "INSERT INTO HCSC_AUDIT.PHI_ACCESS_LOG " +
                      "(EVENT_TYPE, RESOURCE_ID, USER_ID, DESCRIPTION, EVENT_TIMESTAMP, APPLICATION) " +
                      "VALUES (?, ?, ?, ?, ?, ?)")) {
-            // Use a new connection outside current transaction
-            // so audit log commits even if business TX rolls back
             conn.setAutoCommit(true);
 
             ps.setString(1, eventType);
@@ -77,8 +71,6 @@ public class PHIAuditLogger {
             ps.executeUpdate();
 
         } catch (SQLException e) {
-            // Audit failure must NOT fail the business operation
-            // but must be logged to system log for investigation
             log.error("CRITICAL: PHI audit log write failed for event: "
                     + eventType + " resource: " + resourceId
                     + " user: " + userId + " — HIPAA compliance at risk", e);
