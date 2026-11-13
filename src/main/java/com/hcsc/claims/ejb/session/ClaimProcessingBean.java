@@ -6,9 +6,7 @@ import com.hcsc.claims.entity.Member;
 import com.hcsc.claims.util.ClaimNumberGenerator;
 import com.hcsc.claims.util.PHIAuditLogger;
 import org.apache.log4j.Logger;
-
 import jakarta.annotation.Resource;
-import jakarta.ejb.*;
 import jakarta.jms.*;
 import jakarta.naming.InitialContext;
 import jakarta.naming.NamingException;
@@ -16,7 +14,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +22,7 @@ import java.util.Calendar;
 import java.util.List;
 
 @Service
+@EnableTransactionManagement
 public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessingRemote {
 
     private static final Logger log = Logger.getLogger(ClaimProcessingBean.class);
@@ -37,13 +36,8 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
     @PersistenceContext(unitName = "claimsPU")
     private EntityManager entityManager;
 
-    @Resource
-    private UserTransaction userTransaction;
-
     private final MemberValidationBean memberValidationBean;
-
     private final BenefitCalculationBean benefitCalculationBean;
-
     private final FraudDetectionBean fraudDetectionBean;
 
     public ClaimProcessingBean(MemberValidationBean memberValidationBean, BenefitCalculationBean benefitCalculationBean, FraudDetectionBean fraudDetectionBean) {
@@ -52,19 +46,17 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
         this.fraudDetectionBean = fraudDetectionBean;
     }
 
+    @Transactional
     public Claim submitClaim(Claim claim, String submittedBy) {
         log.info("Submitting claim for member: " + claim.getMemberId());
 
         try {
-            userTransaction.begin();
-
             Member member = memberValidationBean.validateMemberEligibility(
                 claim.getMemberId(), claim.getServiceDate());
             if (member == null) {
                 claim.setStatus("DENIED");
                 claim.setDenialReason("Member not eligible on date of service");
                 log.warn("Claim denied — member not eligible: " + claim.getMemberId());
-                userTransaction.rollback();
                 return claim;
             }
 
@@ -110,28 +102,20 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             PHIAuditLogger.log("CLAIM_SUBMITTED", claim.getClaimNumber(),
                 submittedBy, "Claim submitted and " + claim.getStatus());
 
-            userTransaction.commit();
-
             log.info("Claim submitted successfully: " + claim.getClaimNumber()
                 + " status=" + claim.getStatus());
             return claim;
         } catch (Exception e) {
             log.error("Error submitting claim for member: " + claim.getMemberId(), e);
-            try {
-                userTransaction.rollback();
-            } catch (Exception rollbackEx) {
-                log.error("Rollback failed", rollbackEx);
-            }
             throw new RuntimeException("Failed to submit claim", e);
         }
     }
 
+    @Transactional
     public Claim appealClaim(Long originalClaimId, String appealReason, String appealedBy) {
         log.info("Processing appeal for claimId: " + originalClaimId);
 
         try {
-            userTransaction.begin();
-
             Claim originalClaim = entityManager.find(Claim.class, originalClaimId);
             if (originalClaim == null) {
                 throw new RuntimeException("Claim not found: " + originalClaimId);
@@ -175,8 +159,6 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             PHIAuditLogger.log("CLAIM_APPEALED", appealClaim.getClaimNumber(),
                 appealedBy, "Appeal filed for original claim " + originalClaim.getClaimNumber());
 
-            userTransaction.commit();
-
             log.info("Appeal created: " + appealClaim.getClaimNumber()
                 + " for original: " + originalClaim.getClaimNumber());
             return appealClaim;
@@ -184,7 +166,6 @@ public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessin
             throw e;
         } catch (Exception e) {
             log.error("Error processing appeal for claimId: " + originalClaimId, e);
-            try { userTransaction.rollback(); } catch (Exception re) { log.error("Rollback failed", re); }
             throw new RuntimeException("Failed to process appeal", e);
         }
     }
