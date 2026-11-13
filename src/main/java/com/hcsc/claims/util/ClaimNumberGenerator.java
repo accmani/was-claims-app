@@ -1,8 +1,9 @@
 package com.hcsc.claims.util;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.stereotype.Component;
 
 /**
  * Claim Number Generator
@@ -16,13 +17,14 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Migration: No change needed — this class has no WAS dependencies.
  */
+@Component
 public class ClaimNumberGenerator {
 
     private static final AtomicLong sequence = new AtomicLong(1);
-    private static final SimpleDateFormat DATE_PART = new SimpleDateFormat("yyyyMMdd");
+    private static final DateTimeFormatter DATE_PART = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public static String generate() {
-        String datePart = DATE_PART.format(new Date());
+        String datePart = LocalDate.now().format(DATE_PART);
         long seq = sequence.getAndIncrement();
         return String.format("CLM-%s-%06d", datePart, seq);
     }
