@@ -7,7 +7,7 @@
     <groupId>com.hcsc</groupId>
     <artifactId>claims-management</artifactId>
     <version>2.3.1</version>
-    <packaging>ear</packaging>
+    <packaging>war</packaging>
     <name>HCSC Claims Management System</name>
     <description>
         Legacy WAS/EJB application for HCSC claims processing.
@@ -32,24 +32,15 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- IBM WebSphere specific APIs -->
+        <!-- IBM WebSphere API stubs (WSSubject, WSCredential, WSSecurityException): compile-time only.
+             system scope is required by Maven whenever systemPath is used; it is not packaged. The real classes come from WAS.
+             Sources: lib/ibm-was-stubs-8.5.5-sources.jar. Replace with the real WAS artifacts if a Nexus hosting them is available. -->
         <dependency>
             <groupId>com.ibm.websphere</groupId>
-            <artifactId>ibm-jndi</artifactId>
+            <artifactId>ibm-was-stubs</artifactId>
             <version>8.5.5</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.ibm.websphere</groupId>
-            <artifactId>ibm-security</artifactId>
-            <version>8.5.5</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.ibm.websphere</groupId>
-            <artifactId>ibm-ws-runtime</artifactId>
-            <version>8.5.5</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/ibm-was-stubs-8.5.5.jar</systemPath>
         </dependency>
 
         <!-- IBM MQ -->
@@ -57,14 +48,6 @@
             <groupId>com.ibm.mq</groupId>
             <artifactId>com.ibm.mq.allclient</artifactId>
             <version>9.2.4.0</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- DB2 JDBC Driver -->
-        <dependency>
-            <groupId>com.ibm.db2</groupId>
-            <artifactId>db2jcc4</artifactId>
-            <version>4.26.14</version>
             <scope>provided</scope>
         </dependency>
 
@@ -111,14 +94,6 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-ejb-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <ejbVersion>3.1</ejbVersion>
                 </configuration>
             </plugin>
         </plugins>
