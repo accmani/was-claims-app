@@ -1,11 +1,18 @@
 package com.hcsc.claims.util;
 
-import org.apache.log4j.Logger;
-import javax.naming.InitialContext;
-import javax.sql.DataSource;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.util.Date;
+import java.sql.SQLException;
+import java.time.Instant;
 
 /**
  * PHI Audit Logger — HIPAA Compliance
@@ -22,10 +29,18 @@ import java.util.Date;
  *   - Use @Async for non-blocking audit writes
  *   - Consider Elasticsearch for audit log (better for SIEM integration)
  */
+@Component
 public class PHIAuditLogger {
 
-    private static final Logger log = Logger.getLogger(PHIAuditLogger.class);
+    private static final Logger log = LoggerFactory.getLogger(PHIAuditLogger.class);
     private static final String AUDIT_DATASOURCE_JNDI = "jdbc/hcscAuditDS";
+
+    private final DataSource dataSource;
+
+    @Autowired
+    public PHIAuditLogger(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
 
     /**
      * Log a PHI access event.
@@ -35,49 +50,38 @@ public class PHIAuditLogger {
      * @param userId       Who accessed it
      * @param description  Human readable description
      */
-    public static void log(String eventType, String resourceId, String userId, String description) {
+    @Async
+    public void log(String eventType, String resourceId, String userId, String description) {
         // Write to audit log asynchronously — do NOT block business operation
-        // In WAS: use @Asynchronous EJB or WorkManager
         // Migration: @Async Spring method
         writeAuditLog(eventType, resourceId, userId, description);
     }
 
-    private static void writeAuditLog(String eventType, String resourceId,
-                                       String userId, String description) {
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            InitialContext ctx = new InitialContext();
-            DataSource ds = (DataSource) ctx.lookup(AUDIT_DATASOURCE_JNDI);
-
+    private void writeAuditLog(String eventType, String resourceId,
+                                String userId, String description) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO HCSC_AUDIT.PHI_ACCESS_LOG " +
+                     "(EVENT_TYPE, RESOURCE_ID, USER_ID, DESCRIPTION, EVENT_TIMESTAMP, APPLICATION) " +
+                     "VALUES (?, ?, ?, ?, ?, ?)")) {
             // Use a new connection outside current transaction
             // so audit log commits even if business TX rolls back
-            conn = ds.getConnection();
             conn.setAutoCommit(true);
 
-            String sql =
-                "INSERT INTO HCSC_AUDIT.PHI_ACCESS_LOG " +
-                "(EVENT_TYPE, RESOURCE_ID, USER_ID, DESCRIPTION, EVENT_TIMESTAMP, APPLICATION) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
-
-            ps = conn.prepareStatement(sql);
             ps.setString(1, eventType);
             ps.setString(2, resourceId);
             ps.setString(3, userId);
             ps.setString(4, description);
-            ps.setTimestamp(5, new java.sql.Timestamp(new Date().getTime()));
+            ps.setTimestamp(5, java.sql.Timestamp.from(Instant.now()));
             ps.setString(6, "CLAIMS-MANAGEMENT");
             ps.executeUpdate();
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             // Audit failure must NOT fail the business operation
             // but must be logged to system log for investigation
             log.error("CRITICAL: PHI audit log write failed for event: "
-                + eventType + " resource: " + resourceId
-                + " user: " + userId + " — HIPAA compliance at risk", e);
-        } finally {
-            try { if (ps != null) ps.close(); }   catch (Exception e) { /* ignore */ }
-            try { if (conn != null) conn.close(); } catch (Exception e) { /* ignore */ }
+                    + eventType + " resource: " + resourceId
+                    + " user: " + userId + " — HIPAA compliance at risk", e);
         }
     }
 }
