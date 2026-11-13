@@ -14,7 +14,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,7 +21,6 @@ import java.util.Calendar;
 import java.util.List;
 
 @Service
-@EnableTransactionManagement
 public class ClaimProcessingBean implements ClaimProcessingLocal, ClaimProcessingRemote {
 
     private static final Logger log = Logger.getLogger(ClaimProcessingBean.class);
