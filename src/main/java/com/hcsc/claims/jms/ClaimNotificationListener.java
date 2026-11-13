@@ -1,9 +1,9 @@
 package com.hcsc.claims.jms;
 
 import org.apache.log4j.Logger;
+
 import jakarta.jms.*;
-import jakarta.naming.InitialContext;
-import jakarta.naming.NamingException;
+import javax.naming.InitialContext;
 import org.springframework.stereotype.Component;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Migration:
  *   - @MessageDriven → @JmsListener
  *   - Remove activation config properties
- *   - Replace with @Component + @JmsListener(destination = "${app.jms.claims-notification-queue}")
+ *   - Replace with @Component + @JmsListener(destination = "${jms.claims.queue}")
  *   - IBM MQ Spring Boot starter handles connection factory
  *   - jakarta.jms → jakarta.jms
  */
@@ -40,7 +40,8 @@ public class ClaimNotificationListener {
     @Transactional
     public void onMessage(Message message) {
         if (!(message instanceof TextMessage)) {
-            log.warn("Received non-text JMS message — ignoring. Type: " + message.getClass().getName());
+            log.warn("Received non-text JMS message — ignoring. Type: "
+                + message.getClass().getName());
             return;
         }
 
@@ -52,7 +53,8 @@ public class ClaimNotificationListener {
             String status       = message.getStringProperty("status");
             String payload      = textMessage.getText();
 
-            log.info("Processing JMS notification: eventType=" + eventType + " claimNumber=" + claimNumber + " status=" + status);
+            log.info("Processing JMS notification: eventType=" + eventType
+                + " claimNumber=" + claimNumber + " status=" + status);
 
             switch (eventType) {
                 case "CLAIM_SUBMITTED":
@@ -129,7 +131,8 @@ public class ClaimNotificationListener {
             outMsg.setStringProperty("claimNumber", claimNumber);
 
             producer.send(outMsg);
-            log.info("Forwarded " + eventType + " for claim " + claimNumber + " to queue: " + queueJndi);
+            log.info("Forwarded " + eventType + " for claim " + claimNumber
+                + " to queue: " + queueJndi);
         } catch (Exception e) {
             log.error("Failed to forward message to queue: " + queueJndi, e);
             throw new RuntimeException("Queue forwarding failed", e);
