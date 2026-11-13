@@ -1,14 +1,14 @@
 package com.hcsc.claims.ejb.session;
 
 import com.hcsc.claims.entity.Member;
-import org.apache.log4j.Logger;
-
-import javax.ejb.Stateless;
-import javax.ejb.TransactionAttribute;
-import javax.ejb.TransactionAttributeType;
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
-import javax.persistence.PersistenceContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -20,10 +20,11 @@ import java.util.Date;
  * but does not require one. This needs careful mapping to Spring's
  * @Transactional(propagation = Propagation.SUPPORTS)
  */
-@Stateless(name = "MemberValidationBean")
+@Transactional
+@Service
 public class MemberValidationBean implements MemberValidationLocal {
 
-    private static final Logger log = Logger.getLogger(MemberValidationBean.class);
+    private static final Logger log = LoggerFactory.getLogger(MemberValidationBean.class);
 
     @PersistenceContext(unitName = "claimsPU")
     private EntityManager entityManager;
@@ -34,7 +35,7 @@ public class MemberValidationBean implements MemberValidationLocal {
      *
      * HIPAA compliance: Do NOT log member name or DOB.
      */
-    @TransactionAttribute(TransactionAttributeType.SUPPORTS)
+    @Transactional(propagation = Propagation.SUPPORTS)
     public Member validateMemberEligibility(String memberNumber, Date dateOfService) {
         log.info("Validating eligibility for member: " + memberNumber
             + " on " + dateOfService);
@@ -76,7 +77,6 @@ public class MemberValidationBean implements MemberValidationLocal {
 
             log.info("Member eligible: " + memberNumber);
             return member;
-
         } catch (NoResultException e) {
             log.warn("Member not found: " + memberNumber);
             return null;
@@ -99,7 +99,7 @@ public class MemberValidationBean implements MemberValidationLocal {
     /**
      * Check if member has an active authorization for a given procedure.
      */
-    @TransactionAttribute(TransactionAttributeType.SUPPORTS)
+    @Transactional(propagation = Propagation.SUPPORTS)
     public boolean hasAuthorization(String memberNumber, String procedureCode, Date serviceDate) {
         log.info("Checking authorization for member: " + memberNumber
             + " procedure: " + procedureCode);
