@@ -1,9 +1,11 @@
 package com.hcsc.claims.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,12 +57,10 @@ public class Claim implements Serializable {
     private String providerNpi;
 
     @Column(name = "SERVICE_DATE", nullable = false)
-    @Temporal(TemporalType.DATE)
-    private Date serviceDate;
+    private LocalDate serviceDate;
 
     @Column(name = "SUBMITTED_DATE", nullable = false)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date submittedDate;
+    private LocalDateTime submittedDate;
 
     @Column(name = "BILLED_AMOUNT", nullable = false, precision = 12, scale = 2)
     private BigDecimal billedAmount;
@@ -94,7 +94,7 @@ public class Claim implements Serializable {
 
     // One claim has many line items
     @OneToMany(mappedBy = "claim", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<ClaimLineItem> lineItems;
+    private List<ClaimLineItem> lineItems = new ArrayList<>();
 
     // Many claims can be appealed — self-referential for appeal chain
     @ManyToOne(fetch = FetchType.LAZY)
@@ -105,8 +105,7 @@ public class Claim implements Serializable {
     private String createdBy;
 
     @Column(name = "UPDATED_DATE")
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updatedDate;
+    private LocalDateTime updatedDate;
 
     @Version
     @Column(name = "VERSION")
@@ -115,25 +114,25 @@ public class Claim implements Serializable {
     // Default constructor required by JPA spec
     public Claim() {}
 
-    public Claim(String memberId, String providerNpi, Date serviceDate, BigDecimal billedAmount) {
+    public Claim(String memberId, String providerNpi, LocalDate serviceDate, BigDecimal billedAmount) {
         this.memberId = memberId;
         this.providerNpi = providerNpi;
         this.serviceDate = serviceDate;
         this.billedAmount = billedAmount;
-        this.submittedDate = new Date();
+        this.submittedDate = LocalDateTime.now();
         this.status = "PENDING";
         this.isPhi = true;
     }
 
     @PrePersist
     public void prePersist() {
-        this.submittedDate = new Date();
+        this.submittedDate = LocalDateTime.now();
         this.status = "PENDING";
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedDate = new Date();
+        this.updatedDate = LocalDateTime.now();
     }
 
     // Getters and setters
@@ -149,11 +148,11 @@ public class Claim implements Serializable {
     public String getProviderNpi() { return providerNpi; }
     public void setProviderNpi(String providerNpi) { this.providerNpi = providerNpi; }
 
-    public Date getServiceDate() { return serviceDate; }
-    public void setServiceDate(Date serviceDate) { this.serviceDate = serviceDate; }
+    public LocalDate getServiceDate() { return serviceDate; }
+    public void setServiceDate(LocalDate serviceDate) { this.serviceDate = serviceDate; }
 
-    public Date getSubmittedDate() { return submittedDate; }
-    public void setSubmittedDate(Date submittedDate) { this.submittedDate = submittedDate; }
+    public LocalDateTime getSubmittedDate() { return submittedDate; }
+    public void setSubmittedDate(LocalDateTime submittedDate) { this.submittedDate = submittedDate; }
 
     public BigDecimal getBilledAmount() { return billedAmount; }
     public void setBilledAmount(BigDecimal billedAmount) { this.billedAmount = billedAmount; }
@@ -194,8 +193,8 @@ public class Claim implements Serializable {
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 
-    public Date getUpdatedDate() { return updatedDate; }
-    public void setUpdatedDate(Date updatedDate) { this.updatedDate = updatedDate; }
+    public LocalDateTime getUpdatedDate() { return updatedDate; }
+    public void setUpdatedDate(LocalDateTime updatedDate) { this.updatedDate = updatedDate; }
 
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }

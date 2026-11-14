@@ -1,16 +1,15 @@
 package com.hcsc.claims.ejb.session;
 
 import com.hcsc.claims.entity.Claim;
-import org.apache.log4j.Logger;
-
-import javax.ejb.Stateless;
-import javax.ejb.TransactionAttribute;
-import javax.ejb.TransactionAttributeType;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -26,10 +25,11 @@ import java.util.List;
  *   4. Provider billing pattern anomaly
  *   5. Terminated member submitted claim (retroactive fraud)
  */
-@Stateless(name = "FraudDetectionBean")
+@Transactional
+@Service
 public class FraudDetectionBean implements FraudDetectionLocal {
 
-    private static final Logger log = Logger.getLogger(FraudDetectionBean.class);
+    private static final Logger log = LoggerFactory.getLogger(FraudDetectionBean.class);
 
     private static final BigDecimal HIGH_VALUE_THRESHOLD = new BigDecimal("10000.00");
     private static final int MAX_CLAIMS_PER_30_DAYS = 5;
@@ -37,7 +37,7 @@ public class FraudDetectionBean implements FraudDetectionLocal {
     @PersistenceContext(unitName = "claimsPU")
     private EntityManager entityManager;
 
-    @TransactionAttribute(TransactionAttributeType.SUPPORTS)
+    @Transactional(propagation = Propagation.SUPPORTS)
     public boolean checkForFraud(Claim claim) {
         log.info("Running fraud checks for claim: " + claim.getClaimNumber()
             + " member: " + claim.getMemberId());

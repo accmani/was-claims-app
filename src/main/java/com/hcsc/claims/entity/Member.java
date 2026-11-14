@@ -1,6 +1,6 @@
 package com.hcsc.claims.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.io.Serializable;
 import java.util.Date;
 

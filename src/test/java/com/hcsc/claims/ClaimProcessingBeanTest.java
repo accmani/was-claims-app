@@ -6,29 +6,26 @@ import com.hcsc.claims.ejb.session.FraudDetectionBean;
 import com.hcsc.claims.ejb.session.MemberValidationBean;
 import com.hcsc.claims.entity.Claim;
 import com.hcsc.claims.entity.Member;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
-import javax.persistence.EntityManager;
-import javax.transaction.UserTransaction;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.UserTransaction;
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.Instant;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for ClaimProcessingBean.
- * Uses JUnit 4 + Mockito 1.x (WAS era dependencies).
- *
- * Migration: Upgrade to JUnit 5 + Mockito 4.x + Spring Boot Test.
- * Replace @InjectMocks with Spring context / @MockBean.
- * Replace Matchers with ArgumentMatchers.
+ * Uses JUnit 5 + Mockito 4.x + Spring Boot Test.
  */
 public class ClaimProcessingBeanTest {
 
@@ -38,7 +35,7 @@ public class ClaimProcessingBeanTest {
     @Mock
     private EntityManager entityManager;
 
-    @Mock
+    @MockBean
     private UserTransaction userTransaction;
 
     @Mock
@@ -53,14 +50,14 @@ public class ClaimProcessingBeanTest {
     private Claim testClaim;
     private Member testMember;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
-        MockitoAnnotations.initMocks(this);
+        MockitoAnnotations.openMocks(this);
 
         testClaim = new Claim();
         testClaim.setMemberId("MBR12345");
         testClaim.setProviderNpi("1234567890");
-        testClaim.setServiceDate(new Date());
+        testClaim.setServiceDate(Instant.now()); // Changed to use Instant
         testClaim.setBilledAmount(new BigDecimal("500.00"));
         testClaim.setProcedureCode("99213");
         testClaim.setDiagnosisCode("Z00.00");
@@ -71,13 +68,13 @@ public class ClaimProcessingBeanTest {
         testMember.setMemberNumber("MBR12345");
         testMember.setStatus("ACTIVE");
         testMember.setPlanCode("PPO-STANDARD");
-        testMember.setEffectiveDate(new Date(System.currentTimeMillis() - 86400000L * 365));
+        testMember.setEffectiveDate(Instant.now().minusSeconds(86400 * 365)); // Changed to use Instant
     }
 
     @Test
     public void testSubmitClaim_EligibleMember_ApprovedClaim() throws Exception {
         // Given
-        when(memberValidationBean.validateMemberEligibility(anyString(), any(Date.class)))
+        when(memberValidationBean.validateMemberEligibility(anyString(), any(Instant.class))) // Changed to use Instant
             .thenReturn(testMember);
         when(fraudDetectionBean.checkForFraud(any(Claim.class)))
             .thenReturn(false);
@@ -105,7 +102,7 @@ public class ClaimProcessingBeanTest {
     @Test
     public void testSubmitClaim_IneligibleMember_DeniedClaim() throws Exception {
         // Given — member not eligible
-        when(memberValidationBean.validateMemberEligibility(anyString(), any(Date.class)))
+        when(memberValidationBean.validateMemberEligibility(anyString(), any(Instant.class))) // Changed to use Instant
             .thenReturn(null);
 
         // When
@@ -125,7 +122,7 @@ public class ClaimProcessingBeanTest {
     @Test
     public void testSubmitClaim_FraudDetected_PendingReview() throws Exception {
         // Given — fraud detected
-        when(memberValidationBean.validateMemberEligibility(anyString(), any(Date.class)))
+        when(memberValidationBean.validateMemberEligibility(anyString(), any(Instant.class))) // Changed to use Instant
             .thenReturn(testMember);
         when(fraudDetectionBean.checkForFraud(any(Claim.class)))
             .thenReturn(true);
@@ -144,14 +141,14 @@ public class ClaimProcessingBeanTest {
     @Test
     public void testSubmitClaim_ExceptionDuringProcessing_TransactionRolledBack() throws Exception {
         // Given — exception during member validation
-        when(memberValidationBean.validateMemberEligibility(anyString(), any(Date.class)))
+        when(memberValidationBean.validateMemberEligibility(anyString(), any(Instant.class))) // Changed to use Instant
             .thenThrow(new RuntimeException("Database connection lost"));
 
         // When / Then
         try {
             claimProcessingBean.submitClaim(testClaim, "adjuster@hcsc.com");
             fail("Expected EJBException");
-        } catch (javax.ejb.EJBException e) {
+        } catch (jakarta.ejb.EJBException e) {
             // Expected
         }
 

@@ -1,7 +1,6 @@
 package com.hcsc.claims.ejb.session;
 
 import com.hcsc.claims.entity.Claim;
-import javax.ejb.Remote;
 import java.util.List;
 
 /**
@@ -17,7 +16,6 @@ import java.util.List;
  *     B) Replace with gRPC service
  *     C) Replace with Spring Integration gateway
  */
-@Remote
 public interface ClaimProcessingRemote {
     Claim submitClaim(Claim claim, String submittedBy);
     Claim appealClaim(Long originalClaimId, String appealReason, String appealedBy);
