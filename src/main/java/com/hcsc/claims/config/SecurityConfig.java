@@ -23,8 +23,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .antMatchers("/api/**").hasAnyRole("claims-adjuster", "claims-supervisor", "claims-readonly", "medical-review")
-                .antMatchers("/api/admin/**").hasRole("claims-supervisor")
+                .requestMatchers("/api/**").hasAnyRole("claims-adjuster", "claims-supervisor", "claims-readonly", "medical-review")
+                .requestMatchers("/api/admin/**").hasRole("claims-supervisor")
                 .anyRequest().authenticated())
             .httpBasic(basic -> { });   // TODO(architect): replace with the chosen mechanism (OIDC / form / LDAP)
         return http.build();
